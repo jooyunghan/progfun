@@ -1,0 +1,5 @@
+.cache
+.worksheet
+lib_managed
+*.class
+
