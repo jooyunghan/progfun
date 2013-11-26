@@ -9,6 +9,7 @@ import Prop._
 
 abstract class QuickCheckHeap extends Properties("Heap") with IntHeap {
 
+  // singleton, find min
   property("min1") = forAll { a: Int =>
     val h = insert(a, empty)
     findMin(h) == a
@@ -22,8 +23,7 @@ abstract class QuickCheckHeap extends Properties("Heap") with IntHeap {
     else findMin(h) :: toList(deleteMin(h))
 
   property("sorted") = forAll { l: List[Int] =>
-    val l2 = toList(toHeap(l))
-    l2 == l.sorted
+    l.sorted == toList(toHeap(l))
   }
 
 
