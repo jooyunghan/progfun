@@ -1,14 +1,12 @@
 package nodescala
 
-
-
 import scala.language.postfixOps
-import scala.util.{Try, Success, Failure}
+import scala.util.{ Try, Success, Failure }
 import scala.collection._
 import scala.concurrent._
 import ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.async.Async.{async, await}
+import scala.async.Async.{ async, await }
 import org.scalatest._
 import NodeScala._
 import org.junit.runner.RunWith
@@ -31,6 +29,62 @@ class NodeScalaSuite extends FunSuite {
       assert(false)
     } catch {
       case t: TimeoutException => // ok!
+    }
+  }
+
+  test("A list of future transformed into a future of list") {
+    val list = List(1, 2, 3, 4).map(Future.always(_))
+    val result = Await.result(Future.all(list), 1 second)
+    assert(result == List(1, 2, 3, 4))
+  }
+
+  test("Any future which comes first wins") {
+    val list = List(3, 1, 2, 4).map(i => future {
+      blocking {
+        Thread.sleep(i * 1000)
+      }
+      i
+    })
+    val result = Await.result(Future.any(list), 2 second)
+    expectResult(1)(result)
+  }
+
+  test("delay") {
+    val f = Future.delay(1 second)
+    blocking {
+      Thread.sleep(500)
+    }
+    assert(!f.isCompleted)
+    blocking {
+      Thread.sleep(510)
+    }
+    assert(f.isCompleted)
+  }
+
+  test("future now will throw if not completed or failed") {
+    intercept[NoSuchElementException] {
+      Future.never.now
+    }
+    intercept[NoSuchElementException] {
+      Future.delay(1 millis).now
+    }
+    intercept[NoSuchElementException] {
+      future { throw new Error() }.now
+    }
+    expectResult(1)(Future.always(1).now)
+  }
+
+  test("continueWith") {
+    val f = future { 3 }.continueWith(f => 1 + Await.result(f, 1 second))
+    expectResult(4)(Await.result(f, 1 second))
+    
+    val f2 = Future.failed(new Error).continueWith(f => 1) 
+    expectResult(4)(Await.result(f, 1 second))
+    
+    val n = Future.never
+    val f3 = n.continueWith(f => 1)
+    intercept[TimeoutException] {
+      Await.result(f3, 1 second)
     }
   }
 
