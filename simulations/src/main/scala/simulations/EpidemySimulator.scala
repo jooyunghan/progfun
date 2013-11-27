@@ -29,7 +29,7 @@ class EpidemySimulator extends Simulator {
     def apply(p: Person) =
       if (p.visiblyInfectious) 20 else 10
   }
-  val mobility: Mobility = NormalMobility
+  val mobility: Mobility = ReduceMobility
 
   {
     // initial move
@@ -84,7 +84,9 @@ class EpidemySimulator extends Simulator {
     def move() {
       if (!dead) {
         val rooms = cleanRooms()
-        if (!rooms.isEmpty) {
+        if (randomBelow(100) == 0) {
+          moveTo(Room(randomBelow(roomRows), randomBelow(roomColumns)))
+        } else if (!rooms.isEmpty) {
           moveTo(chooseAny(rooms))
         }
         willMove()
