@@ -103,7 +103,7 @@ package object nodescala {
      */
     def run()(f: CancellationToken => Future[Unit]): Subscription = {
       val s = CancellationTokenSource()
-      f(s.cancellationToken) onComplete { _ =>println("onComplete") }
+      f(s.cancellationToken) 
       s
     }
 
