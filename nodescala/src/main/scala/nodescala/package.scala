@@ -6,6 +6,7 @@ import scala.concurrent.duration._
 import ExecutionContext.Implicits.global
 import scala.async.Async.{ async, await }
 import scala.collection.mutable.ListBuffer
+import scala.collection.generic.CanBuildFrom
 
 /**
  * Contains basic data types, data structures and `Future` extensions.
@@ -41,6 +42,22 @@ package object nodescala {
         (f, acc) => for (v <- f; lst <- acc) yield v :: lst
       }
 
+    def sequence2[T](in: List[Future[T]]): Future[List[T]] = {
+      val p = Promise[List[T]]()
+      val failFirst: Throwable => Unit = p tryFailure _
+      in foreach { f =>
+        f onComplete {
+          case Failure(e) => failFirst(e)
+          case _ =>
+        }
+      }
+      in.foldRight(Promise.successful(List.empty[T]).future) {
+        (f, acc) => for (v <- f; a <- acc) yield v :: a
+      } onComplete {
+        p tryComplete _
+      }
+      p.future
+    }
     // fold with async/await
     //    def all[T](fs: List[Future[T]]): Future[List[T]] = {
     //      val zero:Future[List[T]] = always(Nil)
@@ -91,7 +108,7 @@ package object nodescala {
      */
     def delay(t: Duration): Future[Unit] = Future { blocking { Thread.sleep(t.toMillis) } }
 
-    def delay[T](t: Duration, v: =>T): Future[T] = delay(t).map(_ => v)
+    def delay[T](t: Duration, v: => T): Future[T] = delay(t).map(_ => v)
     /**
      * Completes this future with user input.
      */
@@ -104,7 +121,7 @@ package object nodescala {
      */
     def run()(f: CancellationToken => Future[Unit]): Subscription = {
       val s = CancellationTokenSource()
-      f(s.cancellationToken) 
+      f(s.cancellationToken)
       s
     }
 

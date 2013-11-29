@@ -15,6 +15,19 @@ import org.scalatest.junit.JUnitRunner
 @RunWith(classOf[JUnitRunner])
 class NodeScalaSuite extends FunSuite {
 
+  test("fail-fast sequence") {
+    val f: Future[List[Int]] = Future.sequence2(List(1000, 2000, 500).map(sleep => Future {
+      Thread.sleep(sleep)
+      throw new Error("" + sleep)
+    }))
+    val g = f continue {
+      case Success(v) => "success"
+      case Failure(f:ExecutionException) => f.getCause().getMessage()
+      case _ => "error"
+    }
+    expectResult("500")(Await.result(g, 1 second))
+  }
+
   test("A Future should always be created") {
     val always = Future.always(517)
 
