@@ -77,10 +77,10 @@ class NodeScalaSuite extends FunSuite {
   test("continueWith") {
     val f = future { 3 }.continueWith(f => 1 + Await.result(f, 1 second))
     expectResult(4)(Await.result(f, 1 second))
-    
-    val f2 = Future.failed(new Error).continueWith(f => 1) 
+
+    val f2 = Future.failed(new Error).continueWith(f => 1)
     expectResult(4)(Await.result(f, 1 second))
-    
+
     val n = Future.never
     val f3 = n.continueWith(f => 1)
     intercept[TimeoutException] {
@@ -185,9 +185,8 @@ class NodeScalaSuite extends FunSuite {
   test("Server should serve requests") {
     val dummy = new DummyServer(8191)
     val dummySubscription = dummy.start("/testDir") {
-      request => {
+      request =>
         for (kv <- request.iterator) yield (kv + "\n").toString
-      }
     }
 
     // wait until server is really installed
@@ -206,7 +205,6 @@ class NodeScalaSuite extends FunSuite {
 
     dummySubscription.unsubscribe()
   }
-
 }
 
 

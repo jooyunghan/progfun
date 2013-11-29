@@ -22,7 +22,7 @@ object Main {
 
     // 3. create a future that completes after 20 seconds
     //    and continues with a `"Server timeout!"` message
-    val timeOut: Future[String] = Future.delay(20 seconds).map(_ => "Server timeout!")
+    val timeOut: Future[String] = Future.delay(20 seconds, "Server timeout!")
 
     // 4. create a future that completes when either 10 seconds elapse
     //    or the user enters some text and presses ENTER

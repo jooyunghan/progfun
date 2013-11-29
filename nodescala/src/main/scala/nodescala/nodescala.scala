@@ -33,8 +33,8 @@ trait NodeScala {
    *  @param body         the response to write back
    */
   private def respond(exchange: Exchange, token: CancellationToken, response: Response): Unit = {
-    for (s <- response; if token.nonCancelled) {
-      exchange.write(s)
+    while (token.nonCancelled && response.hasNext) {
+      exchange.write(response.next)
     }
     exchange.close
   }
@@ -51,16 +51,17 @@ trait NodeScala {
    *  @return               a subscription that can stop the server and all its asynchronous operations *entirely*.
    */
   def start(relativePath: String)(handler: Request => Response): Subscription = {
-    Future.run() { cts =>
+    val l = createListener(relativePath)
+    val listenerSubscription = l.start()
+    val serverSubscription = Future.run() { cts =>
       async {
-        val l = createListener(relativePath)
-        l.start()
         while (cts.nonCancelled) {
-          val (request, exchange) = await { l.nextRequest() }
-          respond(exchange, cts, handler(request))
+          val (req, ex) = await { l.nextRequest() }
+          async { respond(ex, cts, handler(req)) }
         }
       }
     }
+    Subscription(listenerSubscription, serverSubscription)
   }
 
 }

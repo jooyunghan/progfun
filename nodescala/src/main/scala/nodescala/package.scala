@@ -91,6 +91,7 @@ package object nodescala {
      */
     def delay(t: Duration): Future[Unit] = Future { blocking { Thread.sleep(t.toMillis) } }
 
+    def delay[T](t: Duration, v: =>T): Future[T] = delay(t).map(_ => v)
     /**
      * Completes this future with user input.
      */
@@ -123,7 +124,10 @@ package object nodescala {
      *  However, it is also non-deterministic -- it may throw or return a value
      *  depending on the current state of the `Future`.
      */
-    def now: T = f.value.get.get
+    def now: T = f.value match {
+      case Some(Success(t)) => t
+      case _ => throw new NoSuchElementException
+    }
 
     /**
      * Continues the computation of this future by taking the current future
