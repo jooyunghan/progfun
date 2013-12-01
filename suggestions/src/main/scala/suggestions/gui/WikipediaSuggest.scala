@@ -81,19 +81,24 @@ object WikipediaSuggest extends SimpleSwingApplication with ConcreteSwingApi wit
      */
 
     // TO IMPLEMENT
-    val searchTerms: Observable[String] = ???
+    val searchTerms: Observable[String] = searchTermField.textValues
 
     // TO IMPLEMENT
-    val suggestions: Observable[Try[List[String]]] = ???
-
-
-    // TO IMPLEMENT
-    val suggestionSubscription: Subscription =  suggestions.observeOn(eventScheduler) subscribe {
-      x => ???
+    val suggestions: Observable[Try[List[String]]] = searchTerms.flatMap { term =>
+      ObservableEx(wikipediaSuggestion(term)).recovered
     }
 
     // TO IMPLEMENT
-    val selections: Observable[String] = ???
+    val suggestionSubscription: Subscription = suggestions.observeOn(eventScheduler).subscribe {
+      x =>
+        x match {
+          case Success(list) => suggestionList.listData = list
+          case Failure(e) => status.text = e.getCause().getMessage()
+        }
+    }
+
+    // TO IMPLEMENT
+    val selections: Observable[String] = button.clicks.filter(_ => sel)
 
     // TO IMPLEMENT
     val pages: Observable[Try[String]] = ???
@@ -107,12 +112,10 @@ object WikipediaSuggest extends SimpleSwingApplication with ConcreteSwingApi wit
 
 }
 
-
 trait ConcreteWikipediaApi extends WikipediaApi {
   def wikipediaSuggestion(term: String) = Search.wikipediaSuggestion(term)
   def wikipediaPage(term: String) = Search.wikipediaPage(term)
 }
-
 
 trait ConcreteSwingApi extends SwingApi {
   type ValueChanged = scala.swing.event.ValueChanged
