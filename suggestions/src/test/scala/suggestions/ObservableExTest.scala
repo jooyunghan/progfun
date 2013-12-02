@@ -15,14 +15,6 @@ import scala.collection.mutable.ListBuffer
 
 @RunWith(classOf[org.scalatest.junit.JUnitRunner])
 class ObservableExTest extends FunSuite {
-  test("future to observable") {
-    val q = new SynchronousQueue[Int]
-    val f = future { 10 }
-    val o = ObservableEx(f)
-    o.observeOn(Schedulers.newThread).subscribe(q put _)
-    expectResult(10)(q.poll)
-  }
-
   test("future to observable:failure") {
     val vq = ListBuffer[Int]()
     val eq = ListBuffer[Error]()

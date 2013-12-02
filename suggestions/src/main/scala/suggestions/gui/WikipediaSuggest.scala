@@ -11,7 +11,6 @@ import scala.swing.event._
 import swing.Swing._
 import javax.swing.UIManager
 import Orientation._
-import rx.subscriptions.CompositeSubscription
 import rx.lang.scala.Observable
 import rx.lang.scala.Subscription
 import observablex._
@@ -89,25 +88,31 @@ object WikipediaSuggest extends SimpleSwingApplication with ConcreteSwingApi wit
     }
 
     // TO IMPLEMENT
-    val suggestionSubscription: Subscription = suggestions.observeOn(eventScheduler).subscribe {
-      x =>
-        x match {
-          case Success(list) => suggestionList.listData = list
-          case Failure(e) => status.text = e.getCause().getMessage()
-        }
+    val suggestionSubscription: Subscription = suggestions.observeOn(eventScheduler).subscribe { x =>
+      x match {
+        case Success(list) => suggestionList.listData = list
+        case Failure(e) => status.text = e.getCause().getMessage()
+      }
     }
 
     // TO IMPLEMENT
-    val selections: Observable[String] = button.clicks.filter(_ => sel)
+    val selections: Observable[String] =
+      button.clicks.
+        filter(_ => !suggestionList.selection.items.isEmpty).
+        map(_ => suggestionList.selection.items.head)
 
     // TO IMPLEMENT
-    val pages: Observable[Try[String]] = ???
-
-    // TO IMPLEMENT
-    val pageSubscription: Subscription = pages.observeOn(eventScheduler) subscribe {
-      x => ???
+    val pages: Observable[Try[String]] = selections.flatMap { term =>
+      ObservableEx(wikipediaPage(term)).recovered
     }
 
+    // TO IMPLEMENT
+    val pageSubscription: Subscription = pages.observeOn(eventScheduler) subscribe { x =>
+      x match {
+        case Success(page) => editorpane.text = page
+        case Failure(error) => 
+      }
+    }
   }
 
 }
