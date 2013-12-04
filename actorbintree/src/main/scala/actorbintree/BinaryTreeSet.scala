@@ -131,6 +131,18 @@ class BinaryTreeNode(val elem: Int, initiallyRemoved: Boolean) extends Actor {
           ref ! OperationFinished(id)
         }
       }
+    case msg @ Remove(ref, id, value) =>
+      if (elem == value) {
+        removed = true
+        ref ! OperationFinished(id)
+      } else {
+        val dir = if (value < elem) Left else Right
+        if (subtrees.contains(dir)) {
+          subtrees(dir) forward msg
+        } else {
+          ref ! OperationFinished(id)
+        }
+      }
   }
 
   // optional
