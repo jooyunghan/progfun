@@ -68,7 +68,12 @@ class BinaryTreeSet extends Actor {
   // optional
   /** Accepts `Operation` and `GC` messages. */
   def normal(root: ActorRef): Receive = {
-    case msg => root forward msg
+    case GC =>
+      val newRoot = createRoot
+      root ! CopyTo(newRoot)
+      context.become(garbageCollecting(newRoot, List.empty[Operation]))
+    case msg =>
+      root forward msg
   }
 
   // optional
@@ -77,7 +82,15 @@ class BinaryTreeSet extends Actor {
    * `newRoot` is the root of the new binary tree where we want to copy
    * all non-removed elements into.
    */
-  def garbageCollecting(newRoot: ActorRef): Receive = ???
+  def garbageCollecting(newRoot: ActorRef, pendingQueue: List[Operation]): Receive = {
+    case msg: Operation =>
+      println("--> " + msg)
+      context.become(garbageCollecting(newRoot, msg :: pendingQueue))
+    case _ =>
+      pendingQueue.reverse foreach { msg => println("<-- " + msg) }
+      pendingQueue.reverse foreach (newRoot ! _)
+      context.become(normal(newRoot))
+  }
 
 }
 
@@ -111,6 +124,14 @@ class BinaryTreeNode(val elem: Int, initiallyRemoved: Boolean) extends Actor {
   // optional
   /** Handles `Operation` messages and `CopyTo` requests. */
   def normal(subtrees: Map[Position, ActorRef], removed: Boolean): Receive = {
+    case CopyTo(newRoot) =>
+      if (!removed)
+        newRoot ! Insert(self, 0, elem)
+      subtrees.values foreach (_ ! CopyTo(newRoot))
+      if (removed && subtrees.isEmpty)
+        stop
+      else
+        context.become(copying(subtrees.values.toSet, removed))
     case msg: Operation if needForward(msg, subtrees) =>
       forwardToChild(msg, subtrees)
     case msg @ Contains(ref, id, value) =>
@@ -141,6 +162,21 @@ class BinaryTreeNode(val elem: Int, initiallyRemoved: Boolean) extends Actor {
    * `expected` is the set of ActorRefs whose replies we are waiting for,
    * `insertConfirmed` tracks whether the copy of this node to the new tree has been confirmed.
    */
-  def copying(expected: Set[ActorRef], insertConfirmed: Boolean): Receive = ???
+  def copying(expected: Set[ActorRef], insertConfirmed: Boolean): Receive = {
+    case OperationFinished =>
+      if (expected.isEmpty)
+        stop
+      else
+        copying(expected, true)
+    case a: ActorRef =>
+      if ((expected - a).isEmpty && insertConfirmed)
+        stop
+      else
+        copying(expected - a, insertConfirmed)
+  }
 
+  def stop: Unit = {
+    context.parent ! self
+    context.stop(self)
+  }
 }
