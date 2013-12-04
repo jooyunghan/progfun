@@ -100,44 +100,39 @@ class BinaryTreeNode(val elem: Int, initiallyRemoved: Boolean) extends Actor {
   // optional
   def receive = normal(Map[Position, ActorRef](), initiallyRemoved)
 
+  def childFor(msg: Operation): Position = if (msg.elem < elem) Left else Right
+
+  def needForward(msg: Operation, subtrees: Map[Position, ActorRef]): Boolean =
+    (elem != msg.elem) && (subtrees contains childFor(msg))
+
+  def forwardToChild(msg: Operation, subtrees: Map[Position, ActorRef]) =
+    subtrees(childFor(msg)) forward msg
+
   // optional
   /** Handles `Operation` messages and `CopyTo` requests. */
   def normal(subtrees: Map[Position, ActorRef], removed: Boolean): Receive = {
+    case msg: Operation if needForward(msg, subtrees) =>
+      forwardToChild(msg, subtrees)
     case msg @ Contains(ref, id, value) =>
       if (elem == value)
         ref ! ContainsResult(id, !removed)
-      else {
-        val dir = if (value < elem) Left else Right
-        if (subtrees.contains(dir))
-          subtrees(dir) forward msg
-        else
-          ref ! ContainsResult(id, false)
-      }
+      else
+        ref ! ContainsResult(id, false)
     case msg @ Insert(ref, id, value) =>
       if (elem == value) {
         ref ! OperationFinished(id)
         context.become(normal(subtrees, removed = false))
       } else {
-        val dir = if (value < elem) Left else Right
-        if (subtrees.contains(dir))
-          subtrees(dir) forward msg
-        else {
-          ref ! OperationFinished(id)
-          context.become(normal(subtrees + (dir -> context.actorOf(BinaryTreeNode.props(value, initiallyRemoved = false))),
-              removed))
-        }
+        ref ! OperationFinished(id)
+        context.become(normal(subtrees + (childFor(msg) -> context.actorOf(BinaryTreeNode.props(value, initiallyRemoved = false))),
+          removed))
       }
     case msg @ Remove(ref, id, value) =>
       if (elem == value) {
         ref ! OperationFinished(id)
         context.become(normal(subtrees, removed = true))
       } else {
-        val dir = if (value < elem) Left else Right
-        if (subtrees.contains(dir)) {
-          subtrees(dir) forward msg
-        } else {
-          ref ! OperationFinished(id)
-        }
+        ref ! OperationFinished(id)
       }
   }
 
