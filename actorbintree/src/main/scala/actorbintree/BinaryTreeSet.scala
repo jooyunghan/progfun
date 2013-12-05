@@ -84,12 +84,13 @@ class BinaryTreeSet extends Actor {
    */
   def garbageCollecting(newRoot: ActorRef, pendingQueue: List[Operation]): Receive = {
     case msg: Operation =>
-      println("--> " + msg)
       context.become(garbageCollecting(newRoot, msg :: pendingQueue))
-    case _ =>
-      pendingQueue.reverse foreach { msg => println("<-- " + msg) }
+    case GC =>
+    case CopyFinished =>
       pendingQueue.reverse foreach (newRoot ! _)
       context.become(normal(newRoot))
+    case m => 
+      println("unknown message:" + m)
   }
 
 }
@@ -121,15 +122,21 @@ class BinaryTreeNode(val elem: Int, initiallyRemoved: Boolean) extends Actor {
   def forwardToChild(msg: Operation, subtrees: Map[Position, ActorRef]) =
     subtrees(childFor(msg)) forward msg
 
+  override def toString = elem.toString
+
+  def str(subtrees: Map[Position, ActorRef], removed: Boolean):String = {
+    s"$elem($removed ${subtrees.get(Left)} ${subtrees.get(Right)})"
+  }
   // optional
   /** Handles `Operation` messages and `CopyTo` requests. */
   def normal(subtrees: Map[Position, ActorRef], removed: Boolean): Receive = {
     case CopyTo(newRoot) =>
-      if (!removed)
+      if (!removed) {
         newRoot ! Insert(self, 0, elem)
+      }
       subtrees.values foreach (_ ! CopyTo(newRoot))
       if (removed && subtrees.isEmpty)
-        stop
+        copyFinished
       else
         context.become(copying(subtrees.values.toSet, removed))
     case msg: Operation if needForward(msg, subtrees) =>
@@ -155,6 +162,8 @@ class BinaryTreeNode(val elem: Int, initiallyRemoved: Boolean) extends Actor {
       } else {
         ref ! OperationFinished(id)
       }
+    case m => 
+      println("unknown message in node/normal : " + m)
   }
 
   // optional
@@ -163,20 +172,25 @@ class BinaryTreeNode(val elem: Int, initiallyRemoved: Boolean) extends Actor {
    * `insertConfirmed` tracks whether the copy of this node to the new tree has been confirmed.
    */
   def copying(expected: Set[ActorRef], insertConfirmed: Boolean): Receive = {
-    case OperationFinished =>
+    case m:OperationFinished =>
       if (expected.isEmpty)
-        stop
+        copyFinished
       else
-        copying(expected, true)
-    case a: ActorRef =>
-      if ((expected - a).isEmpty && insertConfirmed)
-        stop
+        context.become(copying(expected, true))
+    case CopyFinished =>
+      val a = sender
+      val remainder = expected - a
+      if (remainder.isEmpty && insertConfirmed)
+        copyFinished
       else
-        copying(expected - a, insertConfirmed)
+        context.become(copying(remainder, insertConfirmed))
+    case m => 
+      println("unknown message in copying: " + m)
   }
 
-  def stop: Unit = {
-    context.parent ! self
-    context.stop(self)
+  def copyFinished: Unit = {
+    println ("copy done " + elem)
+    context.parent ! CopyFinished
+    self ! PoisonPill
   }
 }
