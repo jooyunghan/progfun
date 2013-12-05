@@ -189,7 +189,6 @@ class BinaryTreeNode(val elem: Int, initiallyRemoved: Boolean) extends Actor {
   }
 
   def copyFinished: Unit = {
-    println ("copy done " + elem)
     context.parent ! CopyFinished
     self ! PoisonPill
   }
