@@ -50,6 +50,8 @@ trait WikipediaApi {
   }
 
   implicit class ObservableOps[T](obs: Observable[T]) {
+	def collect[R](p: PartialFunction[T,R]): Observable[R] = 
+	  obs.filter(p.isDefinedAt(_)).map(p(_))
 
     /**
      * Given an observable that can possibly be completed with an error, returns a new observable
@@ -57,13 +59,10 @@ trait WikipediaApi {
      *
      * E.g. `1, 2, 3, !Exception!` should become `Success(1), Success(2), Success(3), Failure(Exception), !TerminateStream!`
      */
-    def recovered: Observable[Try[T]] = {
-      Observable[Try[T]]((observer: Observer[Try[T]]) =>
-        obs.subscribe(
-          (t: T) => observer.onNext(Success(t)),
-          (e: Throwable) => { observer.onNext(Failure(e)); observer.onCompleted },
-          () => { observer.onCompleted }))
-    }
+    def recovered: Observable[Try[T]] = obs.materialize.collect {
+	  case OnNext(v) => Success(v)
+	  case OnError(e) => Failure(e)
+	}
 
     /**
      * Emits the events from the `obs` observable, until `totalSec` seconds have elapsed.
